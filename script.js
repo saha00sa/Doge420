@@ -1,11 +1,25 @@
-let canvas, ctx;
-let doge, obstacles = [], leaves = [];
-let score = 0, tokens = 0;
-let isJumping = false, velocityY = 0, gravity = 0.5;
-let username = '', wallet = '';
-let requestUrl = "https://script.google.com/macros/s/AKfycby4c3w7LpvxR6ncn4kbSCSxujJNiLmgCumai83gqIzN20VyUeGP_zh8-ildiky1lIs/exec";
+let username = "", wallet = "", score = 0, tokens = 0;
+let isJumping = false, velocityY = 0;
+const gravity = 0.5;
+const doge = { x: 50, y: 230, width: 50, height: 50 };
+let obstacles = [], leaves = [];
+let gameRunning = true;
+const requestUrl = "https://script.google.com/macros/s/AKfycby4c3w7LpvxR6ncn4kbSCSxujJNiLmgCumai83gqIzN20VyUeGP_zh8-ildiky1lIs/exec";
 
-function startGame() {
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+document.addEventListener("keydown", jump);
+document.addEventListener("touchstart", jump);
+
+function jump() {
+  if (!isJumping) {
+    velocityY = -10;
+    isJumping = true;
+  }
+}
+
+async function startGame() {
   username = document.getElementById("username").value.trim();
   wallet = document.getElementById("wallet").value.trim();
 
@@ -14,110 +28,127 @@ function startGame() {
     return;
   }
 
+  if (!/^[a-zA-Z0-9]{25,50}$/.test(wallet)) {
+    alert("Invalid wallet address.");
+    return;
+  }
+
+  const valid = await checkDuplicate(username, wallet);
+  if (!valid) {
+    alert("Username or wallet already registered.");
+    return;
+  }
+
   document.getElementById("start-screen").style.display = "none";
   document.getElementById("game-screen").style.display = "block";
-
-  canvas = document.getElementById("gameCanvas");
-  ctx = canvas.getContext("2d");
-
-  doge = { x: 50, y: 250, w: 40, h: 40 };
-
   document.getElementById("bg-music").play();
-  spawnObstacles();
-  spawnLeaves();
-  gameLoop();
+
+  initGame();
 }
 
-function spawnObstacles() {
-  setInterval(() => {
-    obstacles.push({ x: canvas.width, y: 260, w: 20, h: 40 });
-  }, 2000);
+function initGame() {
+  score = 0;
+  tokens = 0;
+  obstacles = [];
+  leaves = [];
+  doge.y = 230;
+  gameRunning = true;
+  update();
 }
 
-function spawnLeaves() {
-  setInterval(() => {
-    leaves.push({ x: canvas.width, y: 230, w: 20, h: 20 });
-  }, 1500);
-}
+function update() {
+  if (!gameRunning) return;
 
-function gameLoop() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Gravity
+  // gravity
   velocityY += gravity;
   doge.y += velocityY;
-  if (doge.y > 250) {
-    doge.y = 250;
+
+  if (doge.y > 230) {
+    doge.y = 230;
     isJumping = false;
   }
 
-  // Draw doge
-  ctx.fillStyle = "orange";
-  ctx.fillRect(doge.x, doge.y, doge.w, doge.h);
+  // draw doge
+  ctx.fillStyle = "#0f0";
+  ctx.fillRect(doge.x, doge.y, doge.width, doge.height);
 
-  // Draw obstacles (police)
-  ctx.fillStyle = "blue";
-  for (let i = obstacles.length - 1; i >= 0; i--) {
-    let ob = obstacles[i];
+  // generate obstacles
+  if (Math.random() < 0.02) {
+    obstacles.push({ x: 800, y: 230, width: 30, height: 50 });
+  }
+
+  // draw obstacles
+  ctx.fillStyle = "#f00";
+  obstacles.forEach((ob, i) => {
     ob.x -= 5;
-    ctx.fillRect(ob.x, ob.y, ob.w, ob.h);
+    ctx.fillRect(ob.x, ob.y, ob.width, ob.height);
 
     if (collision(doge, ob)) {
-      alert("Game Over!\nScore: " + score);
-      sendData();
-      location.reload();
+      gameOver();
     }
+  });
 
-    if (ob.x + ob.w < 0) obstacles.splice(i, 1);
+  // generate leaves
+  if (Math.random() < 0.01) {
+    leaves.push({ x: 800, y: 200, size: 20 });
   }
 
-  // Draw leaves
-  ctx.fillStyle = "green";
-  for (let i = leaves.length - 1; i >= 0; i--) {
-    let lf = leaves[i];
-    lf.x -= 4;
-    ctx.fillRect(lf.x, lf.y, lf.w, lf.h);
+  // draw leaves
+  ctx.fillStyle = "#0f5";
+  leaves.forEach((leaf, i) => {
+    leaf.x -= 5;
+    ctx.beginPath();
+    ctx.arc(leaf.x, leaf.y, leaf.size, 0, Math.PI * 2);
+    ctx.fill();
 
-    if (collision(doge, lf)) {
-      score += 10;
+    if (collision(doge, { x: leaf.x - 10, y: leaf.y - 10, width: 20, height: 20 })) {
       tokens += 10;
-      document.getElementById("score").innerText = score;
-      document.getElementById("tokens").innerText = tokens;
       leaves.splice(i, 1);
     }
+  });
 
-    if (lf.x + lf.w < 0) leaves.splice(i, 1);
-  }
+  // update score
+  score++;
+  document.getElementById("score").innerText = score;
+  document.getElementById("tokens").innerText = tokens;
 
-  requestAnimationFrame(gameLoop);
+  requestAnimationFrame(update);
 }
 
 function collision(a, b) {
-  return a.x < b.x + b.w &&
-         a.x + a.w > b.x &&
-         a.y < b.y + b.h &&
-         a.y + a.h > b.y;
+  return a.x < b.x + b.width && a.x + a.width > b.x &&
+         a.y < b.y + b.height && a.y + a.height > b.y;
 }
 
-document.addEventListener("keydown", (e) => {
-  if ((e.code === "Space" || e.code === "ArrowUp") && !isJumping) {
-    velocityY = -10;
-    isJumping = true;
-  }
-});
+function gameOver() {
+  gameRunning = false;
+  alert(`Game Over!\nScore: ${score}`);
+  sendData(tokens, 0, tokens);
+  document.getElementById("restart-btn").style.display = "inline-block";
+}
 
-function sendData(withdraw = 0) {
-  let remaining = tokens - withdraw;
-  fetch(requestUrl + `?username=${username}&wallet=${wallet}&total=${tokens}&withdraw=${withdraw}&remaining=${remaining}`);
+function restartGame() {
+  location.reload();
 }
 
 function requestWithdraw() {
   if (tokens < 1000) {
-    alert("You need at least 1000 tokens to withdraw.");
+    alert("Minimum withdrawal is 1000 tokens.");
     return;
   }
-  sendData(tokens);
-  alert("Withdrawal request sent!");
+  sendData(tokens, tokens, 0);
   tokens = 0;
-  document.getElementById("tokens").innerText = tokens;
+  alert("Withdrawal requested!");
+}
+
+async function checkDuplicate(username, wallet) {
+  const res = await fetch(requestUrl + `?username=${username}&wallet=${wallet}&check=1`);
+  const txt = await res.text();
+  return txt !== "DUPLICATE";
+}
+
+function sendData(total, withdraw, remaining) {
+  fetch(requestUrl + `?username=${username}&wallet=${wallet}&total=${total}&withdraw=${withdraw}&remaining=${remaining}`);
 }
