@@ -1,109 +1,189 @@
-let username = '';
-let wallet = '';
-let totalTokens = 0;
+let username = "";
+let walletAddress = "";
 let score = 0;
+let totalTokens = 0;
 let gameStarted = false;
-
-// رابط Google Apps Script تبعك
-const scriptURL = "https://script.google.com/macros/s/AKfycbycI-8de_koyjAb0Sj4oGoPI1Glf-rE-vtQEoEjRhQLLcQ5bztwOCZ5lBeK3LM4dicF/exec";
 
 function startGame() {
   username = document.getElementById("username").value.trim();
-  wallet = document.getElementById("wallet").value.trim();
+  walletAddress = document.getElementById("wallet").value.trim();
 
-  if (username === "" || wallet === "") {
-    alert("Please enter both username and Dogecoin wallet address.");
+  if (username === "" || walletAddress.length < 25) {
+    alert("Please enter a valid username and wallet address.");
     return;
   }
 
-  if (wallet.length < 25 || wallet.length > 40) {
-    alert("Invalid wallet address.");
-    return;
-  }
+  // Save to Google Sheets
+  fetch("https://script.google.com/macros/s/AKfycbycI-8de_koyjAb0Sj4oGoPI1Glf-rE-vtQEoEjRhQLLcQ5bztwOCZ5lBeK3LM4dicF/exec", {
+    method: "POST",
+    mode: "no-cors",
+    body: JSON.stringify({
+      username: username,
+      wallet: walletAddress,
+      score: 0,
+      tokens: 0,
+      withdraw: 0,
+      balance: 0
+    })
+  });
 
-  // إخفاء شاشة البداية و إظهار اللعبة
   document.getElementById("start-screen").style.display = "none";
   document.getElementById("game-screen").style.display = "block";
-
-  // تشغيل الموسيقى
   document.getElementById("bg-music").play();
 
-  // إرسال البيانات للسيرفر
-  fetch(scriptURL, {
-    method: 'POST',
-    body: new URLSearchParams({
-      username: username,
-      wallet: wallet,
-      totalTokens: totalTokens,
-      requestWithdraw: 0,
-      remainingBalance: 0
-    })
-  })
-  .then(res => {
-    if (!res.ok) throw new Error("Failed to submit");
-    console.log("Registered:", username);
-    initGame(); // دالة تبدأ اللعبة فعليًا
-  })
-  .catch(err => {
-    alert("Error sending data to server.");
-    console.error(err);
-  });
+  initGame();
 }
 
 function requestWithdraw() {
   if (totalTokens < 1000) {
-    alert("You need at least 1000 tokens to withdraw.");
+    alert("Minimum withdraw is 1000 tokens.");
     return;
   }
 
-  const withdrawAmount = totalTokens;
-  const remaining = 0;
-
-  fetch(scriptURL, {
-    method: 'POST',
-    body: new URLSearchParams({
+  fetch("https://script.google.com/macros/s/AKfycbycI-8de_koyjAb0Sj4oGoPI1Glf-rE-vtQEoEjRhQLLcQ5bztwOCZ5lBeK3LM4dicF/exec", {
+    method: "POST",
+    mode: "no-cors",
+    body: JSON.stringify({
       username: username,
-      wallet: wallet,
-      totalTokens: totalTokens,
-      requestWithdraw: withdrawAmount,
-      remainingBalance: remaining
+      wallet: walletAddress,
+      score: score,
+      tokens: totalTokens,
+      withdraw: totalTokens,
+      balance: 0
     })
-  }).then(() => {
-    alert("Withdraw request sent.");
-    totalTokens = 0;
-    document.getElementById("tokens").textContent = totalTokens;
+  });
+
+  alert("Withdraw request sent!");
+  totalTokens = 0;
+  document.getElementById("tokens").textContent = totalTokens;
+}
+
+function restartGame() {
+  document.getElementById("restart-btn").style.display = "none";
+  score = 0;
+  totalTokens = 0;
+  player.y = 250;
+  obstacles = [];
+  gameStarted = true;
+  document.getElementById("score").textContent = score;
+  document.getElementById("tokens").textContent = totalTokens;
+  update();
+}
+
+// ===== Game Logic =====
+
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+let player = {
+  x: 50,
+  y: 250,
+  width: 50,
+  height: 50,
+  velocityY: 0,
+  gravity: 1.5,
+  jumpPower: -18,
+  grounded: true
+};
+
+let obstacles = [];
+
+function drawPlayer() {
+  ctx.fillStyle = "#ffcc00"; // Replace with Doge image later
+  ctx.fillRect(player.x, player.y, player.width, player.height);
+}
+
+function jump() {
+  if (player.grounded) {
+    player.velocityY = player.jumpPower;
+    player.grounded = false;
+  }
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.code === "Space") jump();
+});
+document.addEventListener("touchstart", jump);
+
+function spawnObstacle() {
+  obstacles.push({
+    x: 800,
+    y: 260,
+    width: 40,
+    height: 40
   });
 }
 
-// دالة مبدئية لتشغيل اللعبة
+function drawObstacles() {
+  ctx.fillStyle = "red"; // Replace with police image later
+  obstacles.forEach((obs) => {
+    ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+  });
+}
+
+function checkCollision(a, b) {
+  return (
+    a.x < b.x + b.width &&
+    a.x + a.width > b.x &&
+    a.y < b.y + b.height &&
+    a.y + a.height > b.y
+  );
+}
+
+function gameOver() {
+  gameStarted = false;
+  document.getElementById("restart-btn").style.display = "block";
+}
+
+function update() {
+  if (!gameStarted) return;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  player.velocityY += player.gravity;
+  player.y += player.velocityY;
+
+  if (player.y >= 250) {
+    player.y = 250;
+    player.velocityY = 0;
+    player.grounded = true;
+  }
+
+  drawPlayer();
+
+  obstacles.forEach((obs) => {
+    obs.x -= 6;
+    if (checkCollision(player, obs)) gameOver();
+  });
+
+  drawObstacles();
+
+  obstacles = obstacles.filter((obs) => obs.x + obs.width > 0);
+
+  requestAnimationFrame(update);
+}
+
 function initGame() {
   gameStarted = true;
   score = 0;
   totalTokens = 0;
   document.getElementById("score").textContent = score;
   document.getElementById("tokens").textContent = totalTokens;
-  startGameLoop();
-}
 
-// loop بسيط
-function startGameLoop() {
-  // مثال فقط: عداد نقاط
   setInterval(() => {
-    if (!gameStarted) return;
-    score += 1;
-    if (score % 10 === 0) {
-      totalTokens += 10;
-      document.getElementById("tokens").textContent = totalTokens;
+    if (gameStarted) spawnObstacle();
+  }, 2000);
+
+  setInterval(() => {
+    if (gameStarted) {
+      score += 1;
+      if (score % 10 === 0) {
+        totalTokens += 10;
+        document.getElementById("tokens").textContent = totalTokens;
+      }
+      document.getElementById("score").textContent = score;
     }
-    document.getElementById("score").textContent = score;
   }, 500);
-}
 
-function restartGame() {
-  location.reload();
+  update();
 }
-
-// اللمس للموبايل
-document.addEventListener("touchstart", () => {
-  // نفذ قفز هنا
-});
