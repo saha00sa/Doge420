@@ -23,3 +23,47 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  align-items: center;
+}
+
+#start-screen input {
+  padding: 10px;
+  width: 80%;
+  border-radius: 10px;
+  border: none;
+}
+
+#start-screen button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  background-color: #0f0;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+#gameCanvas {
+  display: block;
+  background-color: #333;
+  border-radius: 10px;
+  margin: 10px auto;
+}
+
+#score-panel {
+  text-align: center;
+  margin-top: 10px;
+}
+
+#withdraw-btn {
+  padding: 8px 20px;
+  background-color: #0f0;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: 5px;
+}
+
+#withdraw-note {
+  font-size: 12px;
+  color: #ccc;
+}
