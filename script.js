@@ -1,28 +1,109 @@
-// script.js let username = ""; let wallet = ""; let totalTokens = 0; let score = 0; let tokenPerLeaf = 10; const minWithdraw = 1000; let isJumping = false; let gameStarted = false; let sentUsers = {};
+let username = '';
+let wallet = '';
+let totalTokens = 0;
+let score = 0;
+let gameStarted = false;
 
-function startGame() { username = document.getElementById("username").value.trim(); wallet = document.getElementById("wallet").value.trim();
+// رابط Google Apps Script تبعك
+const scriptURL = "https://script.google.com/macros/s/AKfycbycI-8de_koyjAb0Sj4oGoPI1Glf-rE-vtQEoEjRhQLLcQ5bztwOCZ5lBeK3LM4dicF/exec";
 
-if (username === "" || wallet === "") { alert("Please enter your username and wallet address."); return; }
+function startGame() {
+  username = document.getElementById("username").value.trim();
+  wallet = document.getElementById("wallet").value.trim();
 
-if (wallet.length < 25) { alert("Invalid wallet address. Must be at least 25 characters."); return; }
+  if (username === "" || wallet === "") {
+    alert("Please enter both username and Dogecoin wallet address.");
+    return;
+  }
 
-if (localStorage.getItem("user_" + username) || localStorage.getItem("wallet_" + wallet)) { alert("Username or wallet already used."); return; }
+  if (wallet.length < 25 || wallet.length > 40) {
+    alert("Invalid wallet address.");
+    return;
+  }
 
-localStorage.setItem("user_" + username, true); localStorage.setItem("wallet_" + wallet, true);
+  // إخفاء شاشة البداية و إظهار اللعبة
+  document.getElementById("start-screen").style.display = "none";
+  document.getElementById("game-screen").style.display = "block";
 
-document.getElementById("start-screen").style.display = "none"; document.getElementById("game-screen").style.display = "block"; document.getElementById("bg-music").play();
+  // تشغيل الموسيقى
+  document.getElementById("bg-music").play();
 
-gameStarted = true; score = 0; totalTokens = 0; document.getElementById("score").innerText = score; document.getElementById("tokens").innerText = totalTokens; runGameLoop(); }
+  // إرسال البيانات للسيرفر
+  fetch(scriptURL, {
+    method: 'POST',
+    body: new URLSearchParams({
+      username: username,
+      wallet: wallet,
+      totalTokens: totalTokens,
+      requestWithdraw: 0,
+      remainingBalance: 0
+    })
+  })
+  .then(res => {
+    if (!res.ok) throw new Error("Failed to submit");
+    console.log("Registered:", username);
+    initGame(); // دالة تبدأ اللعبة فعليًا
+  })
+  .catch(err => {
+    alert("Error sending data to server.");
+    console.error(err);
+  });
+}
 
-function runGameLoop() { // Placeholder: add your full game logic here const canvas = document.getElementById("gameCanvas"); const ctx = canvas.getContext("2d"); ctx.fillStyle = "#444"; ctx.fillRect(0, 0, canvas.width, canvas.height); // Add game animations, character, obstacles etc. }
+function requestWithdraw() {
+  if (totalTokens < 1000) {
+    alert("You need at least 1000 tokens to withdraw.");
+    return;
+  }
 
-function requestWithdraw() { if (totalTokens < minWithdraw) { alert("Minimum 1000 tokens required to withdraw."); return; } const remaining = totalTokens - minWithdraw; fetch("https://script.google.com/macros/s/AKfycbycI-8de_koyjAb0Sj4oGoPI1Glf-rE-vtQEoEjRhQLLcQ5bztwOCZ5lBeK3LM4dicF/exec", { method: "POST", mode: "no-cors", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ username: username, wallet: wallet, total_tokens: totalTokens, requested_withdraw: minWithdraw, remaining_tokens: remaining }) }); totalTokens = remaining; document.getElementById("tokens").innerText = totalTokens; alert("Withdraw request sent!"); }
+  const withdrawAmount = totalTokens;
+  const remaining = 0;
 
-function restartGame() { document.getElementById("restart-btn").style.display = "none"; document.getElementById("bg-music").play(); runGameLoop(); }
+  fetch(scriptURL, {
+    method: 'POST',
+    body: new URLSearchParams({
+      username: username,
+      wallet: wallet,
+      totalTokens: totalTokens,
+      requestWithdraw: withdrawAmount,
+      remainingBalance: remaining
+    })
+  }).then(() => {
+    alert("Withdraw request sent.");
+    totalTokens = 0;
+    document.getElementById("tokens").textContent = totalTokens;
+  });
+}
 
-document.addEventListener("keydown", function (e) { if (e.code === "Space" || e.code === "ArrowUp") { jump(); } });
+// دالة مبدئية لتشغيل اللعبة
+function initGame() {
+  gameStarted = true;
+  score = 0;
+  totalTokens = 0;
+  document.getElementById("score").textContent = score;
+  document.getElementById("tokens").textContent = totalTokens;
+  startGameLoop();
+}
 
-document.addEventListener("touchstart", function () { jump(); });
+// loop بسيط
+function startGameLoop() {
+  // مثال فقط: عداد نقاط
+  setInterval(() => {
+    if (!gameStarted) return;
+    score += 1;
+    if (score % 10 === 0) {
+      totalTokens += 10;
+      document.getElementById("tokens").textContent = totalTokens;
+    }
+    document.getElementById("score").textContent = score;
+  }, 500);
+}
 
-function jump() { if (isJumping) return; isJumping = true; // jump animation here setTimeout(() => isJumping = false, 500); }
+function restartGame() {
+  location.reload();
+}
 
+// اللمس للموبايل
+document.addEventListener("touchstart", () => {
+  // نفذ قفز هنا
+});
